@@ -39,7 +39,7 @@ set_debug(b::Bool) = (DEBUG[] = b;)
 
 reset_ws_interrupt() = (WS_INTERRUPT[] = false)
 
-# issue https://github.com/tlienart/Franklin.jl/issues/977
+# issue https://github.com/JuliaDocs/Franklin.jl/issues/977
 setverbose = set_verbose
 
 #

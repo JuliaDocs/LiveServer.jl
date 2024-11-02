@@ -1,8 +1,8 @@
 # Live Server for Julia
 
-[![CI Actions Status](https://github.com/tlienart/LiveServer.jl/workflows/CI/badge.svg)](https://github.com/tlienart/LiveServer.jl/actions)
-[![codecov](https://codecov.io/gh/tlienart/LiveServer.jl/branch/master/graph/badge.svg?token=mNry6r2aIn)](https://codecov.io/gh/tlienart/LiveServer.jl)
-[![docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://tlienart.github.io/LiveServer.jl/dev/)
+[![CI](https://github.com/JuliaDocs/LiveServer.jl/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/JuliaDocs/LiveServer.jl/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/JuliaDocs/LiveServer.jl/graph/badge.svg?token=m0lo2IyZ6G)](https://codecov.io/gh/JuliaDocs/LiveServer.jl)
+[![docs](https://img.shields.io/badge/docs-latest%20release-blue)](https://juliadocs.github.io/LiveServer.jl/)
 
 
 This is a simple and lightweight development web-server written in Julia,
@@ -141,7 +141,7 @@ $ julia --project=docs -ie 'using YourPackage, LiveServer; servedocs()'
 ```
 
 **Note**: this works with [Literate.jl](https://github.com/fredrikekre/Literate.jl) as well.
-See [the docs](https://tlienart.github.io/LiveServer.jl/dev/man/ls+lit/).
+See [the docs](https://juliadocs.github.io/LiveServer.jl/dev/man/ls+lit/).
 
 
 ## DEV/Path testing
