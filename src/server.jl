@@ -256,7 +256,7 @@ function get_dir_list(dir::AbstractString)::String
         write(io, """
                 </ul>
                 <hr>
-                <a href="https://github.com/tlienart/LiveServer.jl">
+                <a href="https://github.com/JuliaDocs/LiveServer.jl">
                     💻 LiveServer.jl
                 </a>
             </body>
