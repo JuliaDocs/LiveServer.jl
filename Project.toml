@@ -1,7 +1,7 @@
 name = "LiveServer"
 uuid = "16fef848-5104-11e9-1b77-fb7a48bbb589"
 authors = ["Jonas Asprion <jonas.asprion@gmx.ch", "Thibaut Lienart <tlienart@me.com>"]
-version = "1.4.0"
+version = "1.5.0"
 
 [deps]
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
@@ -9,6 +9,9 @@ LoggingExtras = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 MIMEs = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
 Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[apps]
+liveserver = {}
 
 [compat]
 HTTP = "1"
