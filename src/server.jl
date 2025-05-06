@@ -461,7 +461,7 @@ function serve_file(
         end
     end
 
-    range_match = match(r"^bytes=(\d*)-(\d*)$" , HTTP.header(req, "Range", ""))
+    range_match = match(r"^bytes=(\d+)-(\d*)$" , HTTP.header(req, "Range", ""))
     is_ranged = !isnothing(range_match)
 
     headers = [
@@ -470,18 +470,8 @@ function serve_file(
     if is_ranged
         p(s) = isempty(s) ? nothing : parse(Int64, s)
         start, stop = p.(range_match.captures)
-        if start === nothing
-            if stop === nothing
-                start = 0
-                stop = binary_length(content) - 1
-            else
-                # requesting last bytes
-                start = binary_length(content) - 1 - stop
-                stop = binary_length(content) - 1
-            end
-        elseif stop === nothing
-            stop = binary_length(content) - 1
-        end
+        @assert start isa Int64 # because the regex requires at least one digit
+        stop = something(stop, binary_length(content) - 1)
     
         push!(headers,
             "Content-Range" =>
