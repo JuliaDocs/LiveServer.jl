@@ -461,19 +461,33 @@ function serve_file(
         end
     end
 
-    range_match = match(r"bytes=(\d+)-(\d+)" , HTTP.header(req, "Range", ""))
+    range_match = match(r"^bytes=(\d*)-(\d*)$" , HTTP.header(req, "Range", ""))
     is_ranged = !isnothing(range_match)
 
     headers = [
         "Content-Type" => content_type,
     ]
     if is_ranged
-        range = parse.(Int, range_match.captures)
+        p(s) = isempty(s) ? nothing : parse(Int64, s)
+        start, stop = p.(range_match.captures)
+        if start === nothing
+            if stop === nothing
+                start = 0
+                stop = binary_length(content) - 1
+            else
+                # requesting last bytes
+                start = binary_length(content) - 1 - stop
+                stop = binary_length(content) - 1
+            end
+        elseif stop === nothing
+            stop = binary_length(content) - 1
+        end
+    
         push!(headers,
             "Content-Range" =>
-            "bytes $(range[1])-$(range[2])/$(binary_length(content))"
+            "bytes $(start)-$(stop)/$(binary_length(content))"
         )
-        content  = @view content[1+range[1]:1+range[2]]
+        content  = @view content[1+start:1+stop]
         ret_code = 206
     end
     if allow_cors
