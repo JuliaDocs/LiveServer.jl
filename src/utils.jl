@@ -162,7 +162,7 @@ function scan_docs!(dw::SimpleWatcher,
         for (root, _, files) ∈ walkdir(literate), file ∈ files
             spath = splitext(joinpath(root, file))
             spath[2] == ".jl" || continue
-            path = replace(spath[1], Regex("^$literate") => joinpath(foldername, "src"))
+            path = joinpath(foldername, "src", chopprefix(spath[1], literate))
             k = findfirst(e -> splitext(e.path) == (path, ".md"), dw.watchedfiles)
             k === nothing || push!(remove, k)
         end

@@ -19,7 +19,7 @@ To experiment, do:
 julia> using LiveServer
 julia> LiveServer.servedocs_literate_example("test_dir")
 julia> cd("test_dir")
-julia> servedocs(literate_dir=joinpath("docs", "literate"))
+julia> servedocs(literate_dir=joinpath("docs", "literate"), skip_dir=joinpath("docs", "src", "man"))
 ```
 
 if you then navigate to `localhost:8000` you should end up with
