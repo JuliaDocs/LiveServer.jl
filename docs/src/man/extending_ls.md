@@ -41,7 +41,9 @@ Likely you will want to have some (probably most) of the fields of a `SimpleWatc
 * `callback`: the callback function to be triggered upon an event,
 * `task`: the asynchronous file watching task,
 * `watchedfiles`: the vector of [`LiveServer.WatchedFile`](@ref) i.e. the paths to the file being watched as well as their time of last modification,
-* `sleeptime`: the time to wait before going over the list of `watchedfiles` to check for changes, you won't want this to be too small and it's lower bounded to `0.05` in `SimpleWatcher`.
+* `watchdirs`: the directories that are watched recursively for filesystem events; a change to a file under one of these directories triggers the callback only if that file is in `watchedfiles`,
+* `ignore`: an optional predicate on root-relative paths (always `/`-separated) used to skip watching some paths,
+* `latency`: the coalescing window (in seconds) for filesystem events.
 
 Of course you can add any extra field you may want.
 
@@ -57,7 +59,7 @@ The methods that are _required_ by the rest of the code are
 
 You may also want to re-define existing methods such as
 
-* `file_watcher_task!(::FileWatcher)`: the loop that goes over the watched files, checking for modifications and triggering the callback function. This task will be referenced by the field `CustomWatcher.task`. If errors happen in this asynchronous task, the `CustomWatcher.status` should be set to `:interrupted` so that all running tasks can be stopped properly.
+* `file_watcher_task!(::FileWatcher)`: the task that watches `CustomWatcher.watchdirs` for filesystem events and triggers the callback function for modified files. This task will be referenced by the field `CustomWatcher.task`. If errors happen in this asynchronous task, the `CustomWatcher.status` should be set to `:interrupted` so that all running tasks can be stopped properly.
 * `set_callback!(::FileWatcher, ::Function)`: a helper function to bind a watcher with a callback function.
 * `is_running(::FileWatcher)`: a helper function to check whether `CustomWatcher.task` is done.
 * `is_watched(::FileWatcher, ::AbstractString)`: check if a file is watched by the watcher.
@@ -97,12 +99,15 @@ By default the `coreloopfun` does nothing.
 An example where this mechanism could be used is when your code handles the processing of files from one format (say markdown) to HTML. You want the `FileWatcher` to trigger browser reloads whenever new versions of these HTML files are produced. However, at the same time, you want another process to keep track of the markdown files and re-process them as they change. You can hook this second watcher into the core loop of `LiveServer` using the `coreloopfun`.
 An example for this use case is [JuDoc.jl](https://github.com/tlienart/JuDoc.jl).
 
-## Why not use `FileWatching`?
+## How file watching works
 
-You may be aware of the [`FileWatching`](https://docs.julialang.org/en/v1/stdlib/FileWatching/index.html) module in `Base` and may wonder why we did not just use that one.
-The main reasons we decided not to use it are:
+File changes are detected natively (without polling) using
+[BetterFileWatching.jl](https://github.com/JuliaPluto/BetterFileWatching.jl), which
+builds on Julia's `FileWatching` stdlib (libuv on macOS/Windows, raw `inotify` on Linux)
+to watch directories recursively.
 
-* it triggers _a lot_: where our system only triggers the callback function upon _saving_ a file (e.g. you modified the file and saved the modification), `FileWatching` is more sensitive (for instance it will trigger when you _open_ the file),
-* it is somewhat harder to make your own custom mechanisms to fire page reloads.
-
-So ultimately, our system can be seen as a poor man's implementation of `FileWatching` that is robust, simple and easy to customise.
+Native watchers can be quite sensitive (they may report more events than just a "save"),
+so `SimpleWatcher` filters the raw events: an event only triggers the callback if it
+concerns a file that was explicitly registered via [`watch_file!`](@ref) _and_ the file's
+modification time confirms that its contents actually changed. This keeps the "trigger on
+save" behaviour while relying on the OS to notify us of changes instead of polling.

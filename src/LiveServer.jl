@@ -6,6 +6,9 @@ using Base.Threads: @spawn
 
 using HTTP
 
+using BetterFileWatching: watch_folder, paths_tuple
+using CancellationTokens: CancellationTokenSource, get_token, cancel
+
 export serve, servedocs
 
 #

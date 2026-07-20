@@ -4,12 +4,16 @@ version = "1.6.0"
 authors = ["Jonas Asprion <jonas.asprion@gmx.ch", "Thibaut Lienart <tlienart@me.com>"]
 
 [deps]
+BetterFileWatching = "c9fd44ac-77b5-486c-9482-9798bd063cc6"
+CancellationTokens = "2e8d271d-f2e2-407b-a864-17eb2156783e"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 MIMEs = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
 Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
+BetterFileWatching = "1"
+CancellationTokens = "2.3"
 HTTP = "2"
 MIMEs = "0.1, 1"
 julia = "1.10"

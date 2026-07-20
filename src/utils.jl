@@ -250,8 +250,18 @@ function servedocs(;
     path2makejl  = joinpath(foldername, makejl)
 
     # The file watcher is a default SimpleWatcher with a custom
-    # callback
+    # callback. Watch (recursively) every directory that may contain a watched
+    # source file; the build folder is ignored so that regenerating the docs
+    # does not spuriously wake up the watcher.
     docwatcher = SimpleWatcher()
+    docwatcher.watchdirs = unique!(abspath.(vcat(
+        foldername,
+        include_dirs,
+        dirname.(include_files),
+        literate_dir === nothing ? String[] : [literate_dir],
+    )))
+    docwatcher.ignore =
+        rel -> rel == buildfoldername || startswith(rel, buildfoldername * "/")
     set_callback!(
         docwatcher,
         fp -> servedocs_callback!(
