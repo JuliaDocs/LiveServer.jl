@@ -50,7 +50,7 @@ function update_and_close_viewers!(
 
     # send update message to all viewers
     @sync for wsᵢ in ws_to_update_and_close
-        isopen(wsᵢ.io) && @spawn begin
+        !wsᵢ.writeclosed && @spawn begin
             try
                 HTTP.WebSockets.send(wsᵢ, "update")
             catch
@@ -58,13 +58,13 @@ function update_and_close_viewers!(
         end
     end
 
-    # force close all viewers (these will be replaced by 'fresh' ones
-    # after the reload triggered by the update message)
-    @sync for wsi in ws_to_update_and_close
-        isopen(wsi.io) && @spawn begin
+    # close all viewers in the background — writeclosed is set immediately
+    # inside close(), causing ws_tracker's loop to exit, while the full WS
+    # close handshake completes asynchronously without blocking the callback.
+    for wsi in ws_to_update_and_close
+        !wsi.writeclosed && @spawn begin
             try
-                wsi.writeclosed = wsi.readclosed = true
-                close(wsi.io)
+                close(wsi)
             catch
             end
         end
@@ -485,7 +485,7 @@ function serve_file(
     end
     push!(headers, "Content-Length" => string(binary_length(content)))
     resp         = HTTP.Response(ret_code, content)
-    resp.headers = HTTP.mkheaders(headers)
+    resp.headers = HTTP.Headers(headers)
 
     # add the file to the file watcher
     watch_file!(fw, fs_path)
@@ -518,10 +518,10 @@ function ws_tracker(ws::HTTP.WebSockets.WebSocket)::Nothing
     # NOTE: unless we're in the case of a 404, this file always exists because
     # the query is generated just after serving it; the 404 case will return an
     # empty path.
-    fs_path, case = get_fs_path(ws.request.target, silent=true)
+    fs_path, case = get_fs_path(ws.handshake_request.target, silent=true)
 
     if case in (:not_found_with_404, :not_found_without_404)
-        raw_fs_path, _ = get_fs_path(ws.request.target, onlyfs=true)
+        raw_fs_path, _ = get_fs_path(ws.handshake_request.target, onlyfs=true)
         add_to_viewers(raw_fs_path, ws)
     end
 
@@ -545,7 +545,7 @@ function ws_tracker(ws::HTTP.WebSockets.WebSocket)::Nothing
         # forces the websocket to stay open until it's closed by LiveServer (and
         # not by the browser) upon writing a `update` message on the websocket.
         # See update_and_close_viewers
-        while isopen(ws.io)
+        while !ws.writeclosed
             sleep(0.1)
         end
     catch err
@@ -643,15 +643,6 @@ current directory. (See also [`example`](@ref) for an example folder).
         )
     end
 
-    old_logger = global_logger()
-    old_stderr = stderr
-    global_logger(
-        EarlyFilteredLogger(
-            log -> log._module !== HTTP.Servers,
-            global_logger()
-        )
-    )
-
     server, port = get_server(host, port, req_handler)
     host_str     = ifelse(host == string(Sockets.localhost), "localhost", host)
     url          = "http://$host_str:$port"
@@ -692,10 +683,9 @@ current directory. (See also [`example`](@ref) for an example folder).
         # close any remaining websockets
         for wss ∈ values(WS_VIEWERS)
             @sync for wsi in wss
-                isopen(wsi.io) && @spawn begin
+                !wsi.writeclosed && @spawn begin
                     try
-                        wsi.writeclosed = wsi.readclosed = true
-                        close(wsi.io)
+                        close(wsi)
                     catch
                     end
                 end
@@ -704,19 +694,13 @@ current directory. (See also [`example`](@ref) for an example folder).
         # empty the dictionary of viewers
         empty!(WS_VIEWERS)
         # shut down the server
-        HTTP.Servers.forceclose(server)
+        HTTP.forceclose(server)
         # reset other environment variables
         reset_content_dir()
         reset_ws_interrupt()
         println("✓")
     end
     
-    # given that LiveServer is interrupted via an InterruptException, we have
-    # to be extra careful that things are back as they were before, otherwise
-    # there's a high risk of the disgusting broken pipe error...
-    redirect_stderr(old_stderr)
-    global_logger(old_logger)
-
     return nothing
 end
 
@@ -737,7 +721,7 @@ function get_server(
 
     incr >= 10 && @error "couldn't find a free port in $incr tries"
     try
-        server = HTTP.listen!(host, port; readtimeout=0, verbose=-1) do http::HTTP.Stream
+        server = HTTP.listen!(host, port; read_timeout=0) do http::HTTP.Stream
             if HTTP.WebSockets.isupgrade(http.message)
                 # upgrade to websocket and add to list of viewers and keep open
                 # until written to

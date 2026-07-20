@@ -48,7 +48,7 @@ tasks that you will try to start.
     # define filewatcher outside so that can follow it
     fw = LS.SimpleWatcher(LS.file_changed_callback)
     task = @spawn serve(fw; port=port)
-    sleep(0.1) # give it time to get started
+    timedwait(() -> LS.is_running(fw), 10) # give it time to get started
 
     # there should be a callback associated with fw now
     @test fw.status == :runnable
@@ -97,19 +97,17 @@ tasks that you will try to start.
     # and then subsequently close a websocket. We check this happens properly by adding
     # our own sentinel websocket
     function makews()
-        req = HTTP.Request()
-        return HTTP.WebSockets.WebSocket(
-            HTTP.Connection(IOBuffer()), req, req.response; client=false
-        )
+        io = IOBuffer(UInt8[], read=true, write=true)
+        return HTTP.WebSockets.WebSocket(io, () -> nothing; is_client=false)
     end
     sentinel = makews()
     LS.WS_VIEWERS["tmp.html"] = [sentinel]
 
-    @test sentinel.io.io.writable
+    @test !sentinel.writeclosed
     write("tmp.html", "something new")
     sleep(0.5)
     # the sentinel websocket should be closed
-    @test !sentinel.io.io.writable
+    @test sentinel.writeclosed
     # the websockets should have been flushed
     @test isempty(LS.WS_VIEWERS["tmp.html"])
 
@@ -121,8 +119,8 @@ tasks that you will try to start.
     write("css/foo.css", "body { color:blue; }")
     sleep(0.5)
     # all sentinel websockets should be closed
-    @test !sentinel1.io.io.writable
-    @test !sentinel2.io.io.writable
+    @test sentinel1.writeclosed
+    @test sentinel2.writeclosed
 
     # Mimic an error when building documentation with Documenter.jl. When this
     # happens servedocs_callback!() will set the watcher status to
@@ -174,27 +172,24 @@ end
     cd(mktempdir())
     write("test_file.html", "Hello!")
 
-    server = Sockets.listen(Sockets.localhost, 8001)
-    io = Sockets.connect(Sockets.localhost, 8001)
-    key = "k5zQsAMXfFlvmWIE/YCiEg=="
-    s = HTTP.Stream(
-        HTTP.Request(
-            "GET",
-            "http://localhost:8562/test_file.html",
-            [
-                "Connection" => "upgrade",
-                "Upgrade" => "websocket",
-                "Sec-WebSocket-Key" => key,
-                "Sec-WebSocket-Version" => "13"
-            ]
-        ),
-        HTTP.Connection(io)
-    )
-
-    fs_path, _ = LS.get_fs_path(s.message.target)
+    target = "/test_file.html"
+    fs_path, _ = LS.get_fs_path(target)
     @test fs_path == "test_file.html"
 
-    tsk = @spawn LS.HTTP.WebSockets.upgrade(LS.ws_tracker, s)
+    function make_tracking_ws(tgt)
+        io = IOBuffer(UInt8[], read=true, write=true)
+        ws = HTTP.WebSockets.WebSocket(io, () -> nothing; is_client=false)
+        ws.handshake_request = HTTP.Request("GET", tgt, [
+            "Connection" => "upgrade",
+            "Upgrade" => "websocket",
+            "Sec-WebSocket-Key" => "k5zQsAMXfFlvmWIE/YCiEg==",
+            "Sec-WebSocket-Version" => "13"
+        ])
+        return ws
+    end
+
+    ws1 = make_tracking_ws(target)
+    tsk = @spawn LS.ws_tracker(ws1)
     sleep(1.0)
     # the websocket should have been added to the list
     @test LS.WS_VIEWERS[fs_path] isa Vector{HTTP.WebSockets.WebSocket}
@@ -207,23 +202,8 @@ end
     @test istaskdone(tsk)
     @test !LS.WS_INTERRUPT[]
 
-    io = Sockets.connect(Sockets.localhost, 8001)
-    key = "k5zQsAMXfFlvmWIE/YCiEg=="
-    s = HTTP.Stream(
-            HTTP.Request(
-                "GET",
-                "http://localhost:8562/test_file.html",
-                [
-                    "Connection" => "upgrade",
-                    "Upgrade" => "websocket",
-                    "Sec-WebSocket-Key" => key,
-                    "Sec-WebSocket-Version" => "13"
-                ]
-            ),
-        HTTP.Connection(io)
-    )
-
-    tsk = @spawn LS.HTTP.WebSockets.upgrade(LS.ws_tracker, s)
+    ws2 = make_tracking_ws(target)
+    tsk = @spawn LS.ws_tracker(ws2)
     sleep(1.0)
 
     # simulate a "bad" closure
@@ -235,7 +215,6 @@ end
     @test length(LS.WS_VIEWERS[fs_path]) == 2
 
     # cleanup
-    close(server)
     empty!(LS.WS_VIEWERS)
 
     cd(bk)
